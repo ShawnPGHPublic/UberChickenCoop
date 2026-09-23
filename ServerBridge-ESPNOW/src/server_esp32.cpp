@@ -22,12 +22,12 @@
 #include "KeepTime.h"
 
 // -------------- Config --------------
-const char *WIFI_SSID = "ADD_HERE";
-const char *WIFI_PASS = "ADD_HERE";
+const char *WIFI_SSID = "flamingocow";
+const char *WIFI_PASS = "aa4242bb";
 // Configure MQTT Broker connection
-const char* mqtt_url = "mqtt://ADD_HERE:1883";
-const char* mqtt_user = "ADD_HERE";
-const char* mqtt_pwd = "ADD_HERE";
+const char* mqtt_url = "mqtt://192.168.244.50:1883";
+const char* mqtt_user = "DVES_USER";
+const char* mqtt_pwd = "PqYR1IFWm";
 char mqtt_client_id[20];
 
 
@@ -222,6 +222,8 @@ PsychicMqttClient mqtt;
 int curChannel = -1;
 
 static uint32_t lastStaleCheck = 0;
+
+volatile bool updateWiFiInfo = false;
 
 bool topicIdToMac(const char *topic, uint8_t *outMac) {
   const char *p = strchr(topic, '/');
@@ -445,19 +447,7 @@ void addRegRequest(const uint8_t *mac)
 void onMqttConnect(bool sessionPresent) {
   Serial.printf("[MQTT] %s connected\n\r",mqtt_client_id);
 
-  mqtt.publish(mqtt_bridge_last_time,0,true, String(getUnixTimestamp()).c_str());
-  mqtt.publish(mqtt_bridge_clients, 0, true, getClients().c_str());
-
-  String wifiSettings;
-  wifiSettings = WiFi.macAddress() + " " + WiFi.channel();
-
-  mqtt.publish(mqtt_bridge_wifi, 0, true, wifiSettings.c_str());
-  publishBridgeError("Started");
-
-  Serial.println("[MQTT] working");
-
-  // Do a test send
-  addRegRequest(WIFI_BROADCAST_ADDR);
+  updateWiFiInfo = true;
 }
 
 void onMqttDisconnect(bool sessionPresent) {
@@ -1539,6 +1529,8 @@ void updateWiFiChannel()
 
   // reconnect broadcast
   addPeer(WIFI_BROADCAST_ADDR);
+
+  updateWiFiInfo = true;
 }
 
 // -------------- Setup / Loop --------------
@@ -1578,7 +1570,7 @@ void setup() {
   // Create a unique MQTT client;
   // "DVES_" + max 3 digits + null terminator
   snprintf(mqtt_client_id,12,"ENB_%u", random(10,200));
-  //Serial.println(mqtt_client_id);
+  Serial.println(mqtt_client_id);
 
   mqtt.setClientId(mqtt_client_id);
   mqtt.setCredentials(mqtt_user,mqtt_pwd);
@@ -1602,7 +1594,7 @@ void setup() {
   
   //Serial.printf("Heap (%ld)...\n",ESP.getFreeHeap());
   mqtt.connect();
-  //Serial.printf("Done connecting to MQTT (%ld)...\n",ESP.getFreeHeap());
+  Serial.printf("Done connecting to MQTT (%ld)...\n",ESP.getFreeHeap());
 
   delay(100);
 
@@ -1680,14 +1672,46 @@ void sendImages()
   }
 }
 
+void publishWiFiInfo()
+{
+  updateWiFiInfo = false;
+
+  mqtt.publish(mqtt_bridge_last_time,0,false, String(getUnixTimestamp()).c_str());
+  mqtt.publish(mqtt_bridge_clients, 0, false, getClients().c_str());
+
+  // Serial.println("[publishWiFiInfo] get Wifi");
+
+  // Serial.println(WiFi.macAddress());
+  // Serial.println(WiFi.channel());
+
+  String wifiSettings;
+  wifiSettings = WiFi.macAddress() + " " + WiFi.channel();
+
+  //Serial.println("[MQTT] Publish Wifi");
+
+  mqtt.publish(mqtt_bridge_wifi, 0, true, wifiSettings.c_str());
+  publishBridgeError("Started");
+  
+  //Serial.println("[MQTT] working");
+
+  // Do a test send
+  addRegRequest(WIFI_BROADCAST_ADDR);
+}
+
 void loop() {
 
   if (WiFi.status() != WL_CONNECTED) WiFi.reconnect();
+
 
   if (curChannel != WiFi.channel())
   {
     curChannel = WiFi.channel();
     updateWiFiChannel();
+  }
+
+  if (updateWiFiInfo)
+  {
+    publishWiFiInfo();
   }
 
   deliverClientCmds(4); 
