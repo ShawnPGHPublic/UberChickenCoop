@@ -1,5 +1,7 @@
 # Diagrams
 
+<img width="2000" height="1272" alt="WiringDiagram" src="https://github.com/user-attachments/assets/9c41282d-b395-4698-a044-4a54437fe145" />
+
 **Parts**
 
 ESP32 board supporting ESP-NOW
