@@ -1,0 +1,1 @@
+bool epoch_hour_in_range(time_t epoch, int start_hour, int stop_hour);
